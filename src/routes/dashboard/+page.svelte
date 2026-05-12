@@ -31,6 +31,20 @@
   let mhsError = '';
   let mhsSuccess = '';
 
+  // --- Edit Dosen modal state ---
+  /** @type {any} */
+  let editingDosen = null;
+  let editDosenForm = { nama: '', nip: '', email: '', password: '', role: 'dosen' };
+  let editDosenSubmitting = false;
+  let editDosenError = '';
+
+  // --- Edit Mahasiswa modal state ---
+  /** @type {any} */
+  let editingMhs = null;
+  let editMhsForm = { nama: '', nim: '', email: '', password: '' };
+  let editMhsSubmitting = false;
+  let editMhsError = '';
+
   async function loadAdmin() {
     const [dosen, mhs] = await Promise.all([api('/dosen'), api('/mahasiswa')]);
     dosenList = dosen;
@@ -52,15 +66,11 @@
     data.mahasiswa = data.mahasiswa.map((m) => (m.id === updated.id ? updated : m));
   }
 
+  // ---------- Add: Dosen ----------
   function resetDosenForm() {
     dosenForm = { nama: '', nip: '', email: '', password: '', role: 'dosen' };
     dosenError = '';
   }
-  function resetMhsForm() {
-    mhsForm = { nama: '', nim: '', email: '', password: '', dosen_pembimbing_id: '' };
-    mhsError = '';
-  }
-
   async function submitDosen() {
     dosenSubmitting = true;
     dosenError = '';
@@ -78,6 +88,11 @@
     }
   }
 
+  // ---------- Add: Mahasiswa ----------
+  function resetMhsForm() {
+    mhsForm = { nama: '', nim: '', email: '', password: '', dosen_pembimbing_id: '' };
+    mhsError = '';
+  }
   async function submitMhs() {
     mhsSubmitting = true;
     mhsError = '';
@@ -102,6 +117,88 @@
       mhsError = String(e?.detail ?? e?.message ?? e);
     } finally {
       mhsSubmitting = false;
+    }
+  }
+
+  // ---------- Edit: Dosen ----------
+  function openEditDosen(d) {
+    editingDosen = d;
+    editDosenForm = {
+      nama: d.nama,
+      nip: d.nip,
+      email: d.email,
+      password: '', // blank = tidak diubah
+      role: d.role === 'admin' ? 'admin' : 'dosen'
+    };
+    editDosenError = '';
+  }
+  function closeEditDosen() {
+    editingDosen = null;
+    editDosenError = '';
+  }
+  async function submitEditDosen() {
+    if (!editingDosen) return;
+    editDosenSubmitting = true;
+    editDosenError = '';
+    try {
+      /** @type {any} */
+      const payload = {
+        nama: editDosenForm.nama,
+        nip: editDosenForm.nip,
+        email: editDosenForm.email,
+        role: editDosenForm.role
+      };
+      if (editDosenForm.password && editDosenForm.password.length > 0) {
+        payload.password = editDosenForm.password;
+      }
+      await api(`/dosen/${editingDosen.id}`, { method: 'PUT', body: payload });
+      dosenSuccess = `Dosen "${editDosenForm.nama}" berhasil diperbarui.`;
+      closeEditDosen();
+      await loadAdmin();
+    } catch (e) {
+      editDosenError = String(e?.detail ?? e?.message ?? e);
+    } finally {
+      editDosenSubmitting = false;
+    }
+  }
+
+  // ---------- Edit: Mahasiswa ----------
+  function openEditMhs(m) {
+    editingMhs = m;
+    editMhsForm = {
+      nama: m.nama,
+      nim: m.nim,
+      email: m.email,
+      password: ''
+    };
+    editMhsError = '';
+  }
+  function closeEditMhs() {
+    editingMhs = null;
+    editMhsError = '';
+  }
+  async function submitEditMhs() {
+    if (!editingMhs) return;
+    editMhsSubmitting = true;
+    editMhsError = '';
+    try {
+      /** @type {any} */
+      const payload = {
+        nama: editMhsForm.nama,
+        nim: editMhsForm.nim,
+        email: editMhsForm.email
+      };
+      if (editMhsForm.password && editMhsForm.password.length > 0) {
+        payload.password = editMhsForm.password;
+      }
+      await api(`/mahasiswa/${editingMhs.id}`, { method: 'PUT', body: payload });
+      mhsSuccess = `Mahasiswa "${editMhsForm.nama}" berhasil diperbarui.`;
+      closeEditMhs();
+      await loadAdmin();
+    } catch (e) {
+      editMhsError = String(e?.detail ?? e?.message ?? e);
+    } finally {
+      editMhsSubmitting = false;
     }
   }
 
@@ -153,10 +250,7 @@
     {/if}
 
     {#if showDosenForm}
-      <form
-        class="card mb-4 space-y-4"
-        on:submit|preventDefault={submitDosen}
-      >
+      <form class="card mb-4 space-y-4" on:submit|preventDefault={submitDosen}>
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
             <label class="mb-1 block text-sm font-medium text-slate-700" for="d-nama">Nama</label>
@@ -206,10 +300,11 @@
             <th class="px-4 py-2">Nama</th>
             <th class="px-4 py-2">Email</th>
             <th class="px-4 py-2">Role</th>
+            <th class="px-4 py-2 text-right">Aksi</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
-          {#each data.dosen as d}
+          {#each data.dosen as d (d.id)}
             <tr>
               <td class="px-4 py-2 font-mono text-xs">{d.nip}</td>
               <td class="px-4 py-2">{d.nama}</td>
@@ -217,6 +312,11 @@
               <td class="px-4 py-2">
                 {#if d.role === 'admin'}<span class="badge-admin">admin</span>
                 {:else}<span class="badge-dosen">dosen</span>{/if}
+              </td>
+              <td class="px-4 py-2 text-right">
+                <button class="btn-secondary !px-3 !py-1 text-xs" on:click={() => openEditDosen(d)}>
+                  Edit
+                </button>
               </td>
             </tr>
           {/each}
@@ -247,10 +347,7 @@
     {/if}
 
     {#if showMhsForm}
-      <form
-        class="card mb-4 space-y-4"
-        on:submit|preventDefault={submitMhs}
-      >
+      <form class="card mb-4 space-y-4" on:submit|preventDefault={submitMhs}>
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
             <label class="mb-1 block text-sm font-medium text-slate-700" for="m-nama">Nama</label>
@@ -302,6 +399,7 @@
             <th class="px-4 py-2">Nama</th>
             <th class="px-4 py-2">Email</th>
             <th class="px-4 py-2">Dosen Pembimbing</th>
+            <th class="px-4 py-2 text-right">Aksi</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
@@ -322,12 +420,117 @@
                   {/each}
                 </select>
               </td>
+              <td class="px-4 py-2 text-right">
+                <button class="btn-secondary !px-3 !py-1 text-xs" on:click={() => openEditMhs(m)}>
+                  Edit
+                </button>
+              </td>
             </tr>
           {/each}
         </tbody>
       </table>
     </div>
   </section>
+
+  <!-- ===== EDIT DOSEN MODAL ===== -->
+  {#if editingDosen}
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" on:click|self={closeEditDosen}>
+      <div class="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
+        <h3 class="text-lg font-semibold text-slate-900">Edit Dosen</h3>
+        <p class="mt-1 text-xs text-slate-500">ID: {editingDosen.id}</p>
+
+        <form class="mt-4 space-y-4" on:submit|preventDefault={submitEditDosen}>
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <label class="mb-1 block text-sm font-medium text-slate-700" for="ed-nama">Nama</label>
+              <input id="ed-nama" class="input" bind:value={editDosenForm.nama} required maxlength="100" />
+            </div>
+            <div>
+              <label class="mb-1 block text-sm font-medium text-slate-700" for="ed-nip">NIP</label>
+              <input id="ed-nip" class="input" bind:value={editDosenForm.nip} required maxlength="20" />
+            </div>
+            <div>
+              <label class="mb-1 block text-sm font-medium text-slate-700" for="ed-email">Email</label>
+              <input id="ed-email" type="email" class="input" bind:value={editDosenForm.email} required />
+            </div>
+            <div>
+              <label class="mb-1 block text-sm font-medium text-slate-700" for="ed-role">Role</label>
+              <select id="ed-role" class="input" bind:value={editDosenForm.role}>
+                <option value="dosen">Dosen</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            <div class="md:col-span-2">
+              <label class="mb-1 block text-sm font-medium text-slate-700" for="ed-pass">
+                Password baru <span class="text-slate-400">(kosongkan bila tidak diubah)</span>
+              </label>
+              <input id="ed-pass" type="password" class="input" bind:value={editDosenForm.password} minlength="6" autocomplete="new-password" />
+            </div>
+          </div>
+
+          {#if editDosenError}
+            <div class="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{editDosenError}</div>
+          {/if}
+
+          <div class="flex justify-end gap-2">
+            <button type="button" class="btn-secondary" on:click={closeEditDosen}>Batal</button>
+            <button type="submit" class="btn-primary" disabled={editDosenSubmitting}>
+              {editDosenSubmitting ? 'Menyimpan…' : 'Simpan Perubahan'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  {/if}
+
+  <!-- ===== EDIT MAHASISWA MODAL ===== -->
+  {#if editingMhs}
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" on:click|self={closeEditMhs}>
+      <div class="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
+        <h3 class="text-lg font-semibold text-slate-900">Edit Mahasiswa</h3>
+        <p class="mt-1 text-xs text-slate-500">ID: {editingMhs.id}</p>
+
+        <form class="mt-4 space-y-4" on:submit|preventDefault={submitEditMhs}>
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <label class="mb-1 block text-sm font-medium text-slate-700" for="em-nama">Nama</label>
+              <input id="em-nama" class="input" bind:value={editMhsForm.nama} required maxlength="100" />
+            </div>
+            <div>
+              <label class="mb-1 block text-sm font-medium text-slate-700" for="em-nim">NIM</label>
+              <input id="em-nim" class="input" bind:value={editMhsForm.nim} required maxlength="20" />
+            </div>
+            <div>
+              <label class="mb-1 block text-sm font-medium text-slate-700" for="em-email">Email</label>
+              <input id="em-email" type="email" class="input" bind:value={editMhsForm.email} required />
+            </div>
+            <div>
+              <label class="mb-1 block text-sm font-medium text-slate-700" for="em-pass">
+                Password baru <span class="text-slate-400">(kosongkan bila tidak diubah)</span>
+              </label>
+              <input id="em-pass" type="password" class="input" bind:value={editMhsForm.password} minlength="6" autocomplete="new-password" />
+            </div>
+          </div>
+
+          <p class="text-xs text-slate-500">
+            Dosen pembimbing diubah melalui dropdown di tabel.
+          </p>
+
+          {#if editMhsError}
+            <div class="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{editMhsError}</div>
+          {/if}
+
+          <div class="flex justify-end gap-2">
+            <button type="button" class="btn-secondary" on:click={closeEditMhs}>Batal</button>
+            <button type="submit" class="btn-primary" disabled={editMhsSubmitting}>
+              {editMhsSubmitting ? 'Menyimpan…' : 'Simpan Perubahan'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  {/if}
+
 {:else if $auth?.role === 'dosen'}
   <h1 class="text-2xl font-semibold text-slate-900">Dashboard Dosen</h1>
 
