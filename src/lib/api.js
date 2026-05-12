@@ -2,9 +2,9 @@ import { get } from 'svelte/store';
 import { auth } from './auth.js';
 import { goto } from '$app/navigation';
 
-export const API_BASE =
-  (typeof import.meta !== 'undefined' && import.meta.env?.PUBLIC_API_BASE) ||
-  'http://100.125.72.24:8000';
+import { PUBLIC_API_BASE } from '$env/static/public';
+
+export const API_BASE = PUBLIC_API_BASE || 'http://localhost:8000';
 
 class ApiError extends Error {
   constructor(status, detail) {
