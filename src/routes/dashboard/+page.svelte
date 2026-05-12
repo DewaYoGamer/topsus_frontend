@@ -11,6 +11,26 @@
   let loading = true;
   let error = '';
 
+  // --- Add Dosen form state ---
+  let showDosenForm = false;
+  let dosenForm = { nama: '', nip: '', email: '', password: '', role: 'dosen' };
+  let dosenSubmitting = false;
+  let dosenError = '';
+  let dosenSuccess = '';
+
+  // --- Add Mahasiswa form state ---
+  let showMhsForm = false;
+  let mhsForm = {
+    nama: '',
+    nim: '',
+    email: '',
+    password: '',
+    dosen_pembimbing_id: ''
+  };
+  let mhsSubmitting = false;
+  let mhsError = '';
+  let mhsSuccess = '';
+
   async function loadAdmin() {
     const [dosen, mhs] = await Promise.all([api('/dosen'), api('/mahasiswa')]);
     dosenList = dosen;
@@ -29,8 +49,60 @@
       method: 'PATCH',
       body: { dosen_id: value }
     });
-    // swap the row in place
     data.mahasiswa = data.mahasiswa.map((m) => (m.id === updated.id ? updated : m));
+  }
+
+  function resetDosenForm() {
+    dosenForm = { nama: '', nip: '', email: '', password: '', role: 'dosen' };
+    dosenError = '';
+  }
+  function resetMhsForm() {
+    mhsForm = { nama: '', nim: '', email: '', password: '', dosen_pembimbing_id: '' };
+    mhsError = '';
+  }
+
+  async function submitDosen() {
+    dosenSubmitting = true;
+    dosenError = '';
+    dosenSuccess = '';
+    try {
+      await api('/dosen', { method: 'POST', body: dosenForm });
+      dosenSuccess = `Dosen "${dosenForm.nama}" berhasil ditambahkan.`;
+      resetDosenForm();
+      showDosenForm = false;
+      await loadAdmin();
+    } catch (e) {
+      dosenError = String(e?.detail ?? e?.message ?? e);
+    } finally {
+      dosenSubmitting = false;
+    }
+  }
+
+  async function submitMhs() {
+    mhsSubmitting = true;
+    mhsError = '';
+    mhsSuccess = '';
+    try {
+      const payload = {
+        nama: mhsForm.nama,
+        nim: mhsForm.nim,
+        email: mhsForm.email,
+        password: mhsForm.password,
+        dosen_pembimbing_id:
+          mhsForm.dosen_pembimbing_id === ''
+            ? null
+            : Number(mhsForm.dosen_pembimbing_id)
+      };
+      await api('/mahasiswa', { method: 'POST', body: payload });
+      mhsSuccess = `Mahasiswa "${mhsForm.nama}" berhasil ditambahkan.`;
+      resetMhsForm();
+      showMhsForm = false;
+      await loadAdmin();
+    } catch (e) {
+      mhsError = String(e?.detail ?? e?.message ?? e);
+    } finally {
+      mhsSubmitting = false;
+    }
   }
 
   onMount(async () => {
@@ -59,8 +131,73 @@
   <h1 class="text-2xl font-semibold text-slate-900">Dashboard Admin</h1>
   <p class="text-sm text-slate-600">Kelola daftar dosen dan mahasiswa, assign dosen pembimbing.</p>
 
+  <!-- ===== DOSEN SECTION ===== -->
   <section class="mt-6">
-    <h2 class="mb-3 text-lg font-semibold text-slate-900">Daftar Dosen</h2>
+    <div class="mb-3 flex items-center justify-between">
+      <h2 class="text-lg font-semibold text-slate-900">Daftar Dosen</h2>
+      <button
+        class="btn-primary"
+        on:click={() => {
+          showDosenForm = !showDosenForm;
+          if (!showDosenForm) resetDosenForm();
+        }}
+      >
+        {showDosenForm ? 'Batal' : '+ Tambah Dosen'}
+      </button>
+    </div>
+
+    {#if dosenSuccess}
+      <div class="mb-3 rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+        {dosenSuccess}
+      </div>
+    {/if}
+
+    {#if showDosenForm}
+      <form
+        class="card mb-4 space-y-4"
+        on:submit|preventDefault={submitDosen}
+      >
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div>
+            <label class="mb-1 block text-sm font-medium text-slate-700" for="d-nama">Nama</label>
+            <input id="d-nama" class="input" bind:value={dosenForm.nama} required maxlength="100" />
+          </div>
+          <div>
+            <label class="mb-1 block text-sm font-medium text-slate-700" for="d-nip">NIP</label>
+            <input id="d-nip" class="input" bind:value={dosenForm.nip} required maxlength="20" />
+          </div>
+          <div>
+            <label class="mb-1 block text-sm font-medium text-slate-700" for="d-email">Email</label>
+            <input id="d-email" type="email" class="input" bind:value={dosenForm.email} required />
+          </div>
+          <div>
+            <label class="mb-1 block text-sm font-medium text-slate-700" for="d-pass">Password</label>
+            <input id="d-pass" type="password" class="input" bind:value={dosenForm.password} required minlength="6" />
+          </div>
+          <div>
+            <label class="mb-1 block text-sm font-medium text-slate-700" for="d-role">Role</label>
+            <select id="d-role" class="input" bind:value={dosenForm.role}>
+              <option value="dosen">Dosen</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+        </div>
+
+        {#if dosenError}
+          <div class="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{dosenError}</div>
+        {/if}
+
+        <div class="flex justify-end gap-2">
+          <button type="button" class="btn-secondary" on:click={() => { showDosenForm = false; resetDosenForm(); }}>
+            Batal
+          </button>
+          <button type="submit" class="btn-primary" disabled={dosenSubmitting}>
+            {dosenSubmitting ? 'Menyimpan…' : 'Simpan'}
+          </button>
+        </div>
+      </form>
+    {/if}
+
     <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
       <table class="min-w-full divide-y divide-slate-200 text-sm">
         <thead class="bg-slate-50 text-left text-xs uppercase text-slate-500">
@@ -88,8 +225,75 @@
     </div>
   </section>
 
+  <!-- ===== MAHASISWA SECTION ===== -->
   <section class="mt-8">
-    <h2 class="mb-3 text-lg font-semibold text-slate-900">Daftar Mahasiswa</h2>
+    <div class="mb-3 flex items-center justify-between">
+      <h2 class="text-lg font-semibold text-slate-900">Daftar Mahasiswa</h2>
+      <button
+        class="btn-primary"
+        on:click={() => {
+          showMhsForm = !showMhsForm;
+          if (!showMhsForm) resetMhsForm();
+        }}
+      >
+        {showMhsForm ? 'Batal' : '+ Tambah Mahasiswa'}
+      </button>
+    </div>
+
+    {#if mhsSuccess}
+      <div class="mb-3 rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+        {mhsSuccess}
+      </div>
+    {/if}
+
+    {#if showMhsForm}
+      <form
+        class="card mb-4 space-y-4"
+        on:submit|preventDefault={submitMhs}
+      >
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div>
+            <label class="mb-1 block text-sm font-medium text-slate-700" for="m-nama">Nama</label>
+            <input id="m-nama" class="input" bind:value={mhsForm.nama} required maxlength="100" />
+          </div>
+          <div>
+            <label class="mb-1 block text-sm font-medium text-slate-700" for="m-nim">NIM</label>
+            <input id="m-nim" class="input" bind:value={mhsForm.nim} required maxlength="20" />
+          </div>
+          <div>
+            <label class="mb-1 block text-sm font-medium text-slate-700" for="m-email">Email</label>
+            <input id="m-email" type="email" class="input" bind:value={mhsForm.email} required />
+          </div>
+          <div>
+            <label class="mb-1 block text-sm font-medium text-slate-700" for="m-pass">Password</label>
+            <input id="m-pass" type="password" class="input" bind:value={mhsForm.password} required minlength="6" />
+          </div>
+          <div class="md:col-span-2">
+            <label class="mb-1 block text-sm font-medium text-slate-700" for="m-dosen">Dosen Pembimbing (opsional)</label>
+            <select id="m-dosen" class="input" bind:value={mhsForm.dosen_pembimbing_id}>
+              <option value="">— belum ditentukan —</option>
+              {#each dosenList.filter((d) => d.role === 'dosen') as d}
+                <option value={d.id}>{d.nama} ({d.nip})</option>
+              {/each}
+            </select>
+          </div>
+        </div>
+
+        {#if mhsError}
+          <div class="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{mhsError}</div>
+        {/if}
+
+        <div class="flex justify-end gap-2">
+          <button type="button" class="btn-secondary" on:click={() => { showMhsForm = false; resetMhsForm(); }}>
+            Batal
+          </button>
+          <button type="submit" class="btn-primary" disabled={mhsSubmitting}>
+            {mhsSubmitting ? 'Menyimpan…' : 'Simpan'}
+          </button>
+        </div>
+      </form>
+    {/if}
+
     <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
       <table class="min-w-full divide-y divide-slate-200 text-sm">
         <thead class="bg-slate-50 text-left text-xs uppercase text-slate-500">
